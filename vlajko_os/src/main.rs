@@ -11,9 +11,14 @@ use bootloader::{BootInfo, entry_point};
 
 entry_point!(kernel_main);
 
+extern crate alloc;
+
+use alloc::{boxed::Box, vec::Vec};
+
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
   use vlajko_os::memory::BootInfoFrameAllocator;
   use vlajko_os::memory;
+  use vlajko_os::allocator;
   use x86_64::{structures::paging::Translate, VirtAddr};
   use x86_64::{structures::paging::Page};
 
@@ -22,11 +27,24 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
   let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
   let mut mapper = unsafe { memory::init(phys_mem_offset) };
-  let mut frame_allocator = unsafe { BootInfoFrameAllocator::init(&boot_info.memory_map) };
+  let mut frame_allocator = unsafe {
+      BootInfoFrameAllocator::init(&boot_info.memory_map)
+  };
+
+  allocator::init_heap(&mut mapper, &mut frame_allocator)
+      .expect("heap initialization failed");
+
+  let x = Box::new(41);
+
+  let mut vec = Vec::new();
+  for i in 0..500 {
+      vec.push(i);
+  }
 
   #[cfg(test)]
   test_main();
 
+  println!("It did not crash!");
   vlajko_os::hlt_loop();
 }
 
