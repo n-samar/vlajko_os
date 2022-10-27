@@ -7,16 +7,30 @@
 use core::panic::PanicInfo;
 use vlajko_os::println;
 
-#[no_mangle]
-pub extern "C" fn _start() -> ! {
-    println!("Hello World{}", "!");
+use bootloader::{BootInfo, entry_point};
 
-    vlajko_os::init();
+entry_point!(kernel_main);
 
-    #[cfg(test)]
-    test_main();
+fn kernel_main(boot_info: &'static BootInfo) -> ! {
+  use vlajko_os::memory::active_level_4_table;
+  use x86_64::VirtAddr;
 
-    vlajko_os::hlt_loop()
+  println!("Hello World!");
+  vlajko_os::init();
+
+  let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
+  let l4_table = unsafe { active_level_4_table(phys_mem_offset) };
+
+  for (i, entry) in l4_table.iter().enumerate() {
+      if !entry.is_unused() {
+          println!("L4 Entry {}: {:?}", i, entry);
+      }
+  }
+
+  #[cfg(test)]
+  test_main();
+
+  vlajko_os::hlt_loop();
 }
 
 /// This function is called on panic.
